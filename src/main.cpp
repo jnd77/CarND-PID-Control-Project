@@ -4,6 +4,7 @@
 #include <string>
 #include "json.hpp"
 #include "PID.h"
+#include "Twiddle.h"
 
 // for convenience
 using nlohmann::json;
@@ -34,11 +35,14 @@ int main() {
   uWS::Hub h;
 
   PID pid;
+  Twiddle twiddle;
   /**
    * TODO: Initialize the pid variable.
    */
+  pid.Init(1.36, 0.0005, 11.1, -1., 1.);
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
+
+  h.onMessage([&pid, &twiddle](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -63,16 +67,36 @@ int main() {
            * NOTE: Feel free to play around with the throttle and speed.
            *   Maybe use another PID controller to control the speed!
            */
-          
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value 
-                    << std::endl;
+		  // Change to false when running twiddle
+		  if (true) {
+            pid.UpdateError(cte);
+		    steer_value = pid.ControlValue();
+            // DEBUG
+            std::cout << "CTE: " << cte << " Steering Value: " << steer_value 
+                      << std::endl;
+		  } else {
+		    steer_value = twiddle.NewStep(ws, cte);
+		  }
+
+		  // Some turns are too sharp, so need to slow down
+		  double throttle = 0.5;
+		  if (speed > 20) {
+		    if (abs(steer_value) < 0.2) {
+			  throttle = 0.3;
+			} else if (abs(steer_value) < 0.5) {
+			  throttle = 0.2;
+			} else if (abs(steer_value) < 0.7) {
+			  throttle = 0.0;
+			} else
+			  throttle = -0.1;
+		  }
+		    
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
+          msgJson["throttle"] = throttle;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }  // end "telemetry" if
       } else {

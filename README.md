@@ -3,6 +3,75 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+## Objective
+
+The objective of this project is to implement a PID controller on the steering, to ensure the car has a smooth trajectory around the lake.
+
+### PID implementation
+
+The PID controller is quite simple to implement.
+There are 3 parameters (Kp, Ki and Kd) which have all the following role:
+
+--> Kp: based on how far the car is from the ideal trajectory, it will correct the steering in the proper direction
+--> Ki: based on how far the car has been from the center since the simulator started, it will correct accordingly.
+        The main role is to correct for any bias in the controller and ensure we correct for it.
+--> Kd: based on whether the car is getting closer or not to the center; this will smooth the trajectory.
+
+The main challenge however is to calibrate these 3 parameters.
+
+### Twiddle implementation
+
+This algorithm is here to calibrate the 3 parameters.
+Basically, it tweks each parameter up and down independently and measures the total error to know if the tweak is an improvement or not.
+If tweaking up or down does not improve the PID controller, then the tweak's size is reduced by a factor of 10%.
+Similarly, if one of the tweak provides an improvement, then we keep the improved value and also increases the tweak's size by 10%.
+
+The Twiddle algorithm is run by switching a boolean from true to false in the code, and some logs are provided to follow the number of iterations.
+
+The implementation is quite standard. The simulator is run for 4,000 steps, to make sure the car is reaching the first curb.
+We also noticed it was a good idea to cap the CTE at 5 (i.e. the width of the road), to make sure the best solution is not to be stuck immediately on the kerb.
+
+
+### Parameters influence
+
+While Twiddle is running, one can easily view the influence of the parameters on the trajectory.
+
+When Kp is negative, the car is steering away from the trajectory.
+When it's too high, then the steering back towards the center is very strong, so strong that the car can drive off the road on the opposite side.
+It keeps overshooting the center, and steers back in the other direction, making it a very jerky ride.
+
+When Ki is too high (in absolute value), then the car quickly steers off the road (as the error has accumulates).
+
+Finally, when Kd is too high, the car does not go back to the center.
+If it's negative, it actually drives in a circle ...
+
+
+### Twiddle results
+
+We run the Twiddle algorithm a first time.
+
+The first run (with all parameters set at 0) generates a total error of 79,000 (i.e. the car is on average 4.5 meters away from the center).
+After 80 iterations, the best parameters are respectively 1.4, 0.0004 and 6.8, with an error of 185 (error of only 20 centimeters).
+
+However this shows that the delta is way too big for Ki, and the parameter is not optimized.
+
+
+So we run the algorithm a second time with starting values of (1., 0.0005, 10.) and deltas of (0.2, 0.0001, 1.).
+After a dozen of iterations, the parameters settle to around (1.36, 0.0005, 11.1), being an error of 85 (or less than 15 centimeters).
+
+
+### Final implementation
+
+Unfortunetely when using the parameters fine-tuned above, the car goes off track in the sharp turns at the end of the track (it is too far to be taken into account during Twiddle).
+The likely cause of going off track is the car going too fast, and therefore going off track before it has time to compensate.
+
+So we add a few lines of code to control the throttle (only when speed is already large enough). 
+When the steering is quite small, we give full throttle.
+We lower the throttle then as the sterring increases, even applying brake where we are near full steering.
+
+Once we run this code, the car runs quite smoothly around the lake.
+
+
 ## Dependencies
 
 * cmake >= 3.5
